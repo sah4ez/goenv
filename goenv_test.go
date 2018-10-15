@@ -56,8 +56,9 @@ func TestDefault(t *testing.T) {
 	if ts.TestDuration != d {
 		t.Error("TestBool should be false")
 	}
+	// FIXE: failed test
 	if ts.TestURL != url {
-		t.Error("TestBool should be ", url.String())
+		t.Error("TestURL should be ", url.String(), "but", ts.TestURL)
 	}
 }
 

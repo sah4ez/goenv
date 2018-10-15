@@ -21,24 +21,37 @@ import (
 
 // env name constants
 const (
-	{{range $key, $val := .}}
-	{{$key}}EnvName = "{{$key}}"
-	{{end}}
+	{{- range $key, $val := . }}
+	{{$key}}EnvName = "{{$val.Name}}"
+	{{- end }}
 )
 
 // Config service configuration
 type Config struct {
+	{{- range $key, $val := . }}
+	{{- if eq $val.Type "Duration" }}
+	{{$key}} time.{{$val.Type}}
+	{{- else }}
+	{{$key}} {{$val.Type}}
+	{{- end }}
+	{{- end }}
 }
 
 // Get get env config vars
 func Get() (*Config, error) {
 	cfg := &Config{}
-	goenv.StringVar(&cfg.HTTPAddr, HTTPAddrEnvName, ":9000")
+	{{- range $key, $val := . }}
+	{{- if eq $val.Type "string" }}
+	goenv.{{ $val.Type }}Var(&cfg.{{ $val.Name }}, {{ $val.Name }}EnvName, "{{ $val.Value }}")
+	{{- else }}
+	goenv.{{ $val.Type }}Var(&cfg.{{ $val.Name }}, {{ $val.Name }}EnvName, {{ $val.Value }})
+	{{- end }}
+	{{- end }}
 
-	goenv.Parse()
-	if cfg.Mongo.URL == "" {
-		return nil, fmt.Errorf("could not set %s", DBConnStrEnvName)
-	}
+	//goenv.Parse()
+	//if cfg.Mongo.URL == "" {
+	//	return nil, fmt.Errorf("could not set %s", DBConnStrEnvName)
+	//}
 	return cfg, nil
 }
 `

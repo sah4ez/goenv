@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	lineRegExpPattern         = `\A\s*(?:export\s+)?([\w\.]+)(?:\s*=\s*|:\s+?)('(?:\'|[^'])*'|"(?:\"|[^"])*"|[^#\n]+)?\s*(?:\s*\#.*)?\z`
+	lineRegExpPattern         = `\A\s*(?:export\s+)?([\w\.]+)(?:\s*=\s*|:\s+?)('(?:\'|[^'])*'|"(?:\"|[^"])*"|[^#\n]+|)(?:\s*\#\s*)?((?:\z)|\w+)\z`
 	variableRegExpPattern     = `(\\)?(\$)(\{?([A-Z0-9_]+)?\}?)`
 	removeQuotesRegExpPattern = `\A(['"])(.*)(['"])\z`
 )
@@ -20,8 +20,27 @@ var (
 	removeQuotesRegExp = regexp.MustCompile(removeQuotesRegExpPattern)
 )
 
+var availableTypes = map[string]bool{
+	"int":      true,
+	"int32":    true,
+	"int64":    true,
+	"float":    true,
+	"float32":  true,
+	"float64":  true,
+	"string":   true,
+	"bool":     true,
+	"Duration": true,
+}
+
+// Var structure describe environment variable
+type Var struct {
+	Name  string
+	Value string
+	Type  string
+}
+
 // EnvVars environment variables.
-type EnvVars map[string]string
+type EnvVars map[string]Var
 
 // Loader loading env file.
 type Loader struct {
@@ -59,20 +78,28 @@ func (l *Loader) parse(f *os.File) (EnvVars, error) {
 	return envVars, nil
 }
 
-func (l *Loader) parseLine(line string) (key string, val string, err error) {
+func (l *Loader) parseLine(line string) (key string, val Var, err error) {
 	parts := lineRegExp.FindStringSubmatch(line)
 
 	if len(parts) == 0 {
 		st := strings.TrimSpace(line)
 		if st == "" || strings.HasPrefix(st, "#") {
-			return "", "", nil
+			return "", val, nil
 		}
-		return "", "", fmt.Errorf("Line `%s` doesn't match format", line)
+		return "", val, fmt.Errorf("Line `%s` doesn't match format", line)
 	}
 	key = parts[1]
-	val = parts[2]
+	val.Name = parts[1]
+	val.Value = removeQuotesRegExp.ReplaceAllString(parts[2], "$2")
 
-	val = removeQuotesRegExp.ReplaceAllString(val, "$2")
+	if parts[3] == "" {
+		parts[3] = "string"
+	}
+	val.Type = parts[3]
+
+	if _, ok := availableTypes[val.Type]; !ok {
+		return "", val, fmt.Errorf("unexpected type %s of value", val.Type)
+	}
 
 	return key, val, nil
 }
